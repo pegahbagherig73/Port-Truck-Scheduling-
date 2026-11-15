@@ -1,0 +1,121 @@
+NUMERICAL EXPERIMENT PARAMETERS AND MODEL SETTINGS
+====================================================
+
+PURPOSE AND SOURCE PRIORITY
+---------------------------
+This file describes the NUMERICAL INSTANCE USED IN THE PAPER and its
+Gurobi implementation. Experimental values are taken from the "Inputs"
+worksheets of the exported results:
+  - Solution w0.xlsx   (traffic-peak weight lambda = 0)
+  - Solution w200.xlsx (traffic-peak weight lambda = 200)
+Implementation rules are checked against the attached halifax_port_v3(1).py.
+The editable defaults in that Python file differ from the published runs
+in cargo quantities and peak-hour windows; see the discrepancy note below.
+
+1. STUDY NETWORK
+----------------
+Network:             Simplified Halifax-inspired road network
+Port nodes:          P1, P2
+Common destination:  D
+Urban node set:      {P1, P2, 2, 3, ..., 17}
+Monitored urban roads: 39 physical links (two directed arcs per physical link)
+Road inputs:         Adjacency, Baseline minutes, Nodes, Urban mask
+Source workbook:     Halifax_Network_Baseline v2.xlsx
+Road connectivity:   Symmetric binary adjacency; no self-loops
+Spatial monitoring:  A road is urban when both endpoints are in the urban node set
+Routing:             Alternative feasible routes for loaded and empty trips
+Truck-flow states:   Loaded (L), Empty (E)
+Fleet ownership:     Each fleet belongs to its home port; no fleet sharing
+Waiting:             Allowed at home ports and destination; not at intermediate nodes
+Network inputs:      Provisional/illustrative, not calibrated observed traffic data
+Important:           Link-level adjacency, baseline travel times, and coordinates
+                     come from the external network workbook, not the Python file.
+                     That workbook is needed to reproduce the entire instance.
+
+2. SIMULATION CALENDAR
+----------------------
+Start:               Day 1, 00:00
+End:                 Day 3, 00:00 (= Day 2, 24:00)
+Planning horizon:    48 hours = 2,880 minutes
+Model time step:     10 minutes
+Number of intervals: 288
+Report step:         120 minutes (for summary reporting only)
+Event conventions:   Time t is an event; period t is [t, t+1)
+Inventory snapshots: After events at time t
+
+3. PORT, CARGO, AND FLEET PARAMETERS
+-----------------------------------
+Cargo-release type:       One batch per port
+Cargo release time:       Day 1, 06:00 (360 minutes after the start)
+Cargo at P1:             70 full truckload units
+Cargo at P2:             70 full truckload units
+Total cargo:             140 full truckload units
+Cargo per loaded truck:  1 full truckload unit
+Required loaded trips:   70 from P1 + 70 from P2 = 140
+Fleet at P1:             20 trucks
+Fleet at P2:             20 trucks
+Total fleet:             40 trucks
+Loading bays at P1:      4 simultaneous loading operations
+Loading bays at P2:      4 simultaneous loading operations
+Loading duration:        30 minutes = 3 model intervals
+Destination turnaround:  60 minutes = 6 model intervals
+Port loading hours:      06:00-18:00 on both days
+Loading closures:        No additional off-periods
+Road travel:             May continue outside port loading hours
+Destination activity:    Fixed turnaround duration; no detailed unloading queue
+Completion:              All cargo delivered and trucks home by the horizon
+Cargo accounting:        Cargo remains in port inventory during loading;
+                         inventory decreases when a loaded truck departs
+
+4. TIME-DEPENDENT TRAVEL CONDITIONS
+-----------------------------------
+Peak windows on both days:
+  Morning:                07:00-10:00
+  Afternoon:              15:00-18:00
+Urban travel-time multiplier inside peak windows: 2.0
+Outside peak windows:                             1.0
+Non-urban road multiplier:                        1.0
+FIFO-arrival enforcement:                         Enabled
+Travel-duration rounding:                         To nearest 10-minute interval,
+                                                   minimum one interval
+Travel costs:           Calculated from unrounded adjusted travel minutes,
+                        plus additional time for any FIFO correction
+                        (see implementation in Python file)
+Time dependence:        Both arc travel durations and corresponding road-entry
+                        costs vary with departure time in the numerical runs.
+
+5. COSTS AND OBJECTIVE SETTINGS
+-------------------------------
+Transportation rate:         2.0 illustrative cost units / truck-minute
+Applied to:                 Both loaded and empty road movements
+Cargo-clearance cost rate:  60.0 illustrative cost units / uncleared port-hour
+Cargo-clearance cost / 10-min period: 10.0 cost units / uncleared port
+Cargo-clearance definition: Charged while a port has cargo inventory,
+                            including cargo in loading and closed hours;
+                            ends when all cargo departs the port
+Traffic balancing weight lambda:
+  Case A (cost-based):      0
+  Case B (flow-balanced):   200
+Road-flow penalty:         lambda * f
+f definition:              Universal maximum across urban physical roads
+                           and 10-minute intervals of combined entering
+                           truck counts (both directions, both fleets,
+                           both loaded and empty states)
+Note:                      f measures road ENTRIES, not link occupancy,
+                           measured congestion, or emissions.
+Total objective:           Transportation cost + cargo-clearance cost
+                           + lambda * maximum urban physical-road entries
+
+6. GUROBI COMPUTATIONAL SETTINGS
+--------------------------------
+Solver:               Gurobi 12.0.1 (from exported result summaries)
+MILP gap tolerance:   0.01 (1%)
+Time limit:           300 seconds per solve
+Threads:              4
+Random seed:          1
+Reference warm start: Enabled (greedy feasible reference schedule)
+Numerical audit tol.: 1e-5
+Model size reported:  84,605 variables; 79,236 constraints
+Optimization cases:   lambda = 0 and lambda = 200
+Exported validation: PASS for both runs (zero reported failures)
+
